@@ -76,4 +76,4 @@ class LogCosH(Loss):
         :param y: The expected value
         :return: The logcosh derivative according to x and y
         """
-        raise NotImplementedError
+        return np.tanh(y - x)

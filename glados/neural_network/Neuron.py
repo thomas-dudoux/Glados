@@ -55,10 +55,10 @@ class Neuron:
             error = self.loss.compute(pred, it_y_train)
             print(f'Loss : {error}')
             for xi, xt in enumerate(it_x_train):
-                base_gradient = self.loss.derivative(pred[xi], it_y_train[xi]) * self.activation(pred[xi], derivative=True)
+                base_gradient = self.loss.derivative(it_y_train[xi], pred[xi]) * self.activation(pred[xi], derivative=True)
                 for w in range(len(self.weights)):
-                    self.weights[w] -= self.learning_rate * (base_gradient * xt[w])
-                self.bias -= self.learning_rate * base_gradient
+                    self.weights[w] += self.learning_rate * (base_gradient * xt[w])
+                self.bias += self.learning_rate * base_gradient
             if x_val and y_val:
                 pass
 

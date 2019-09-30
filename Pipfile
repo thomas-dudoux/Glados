@@ -5,10 +5,11 @@ verify_ssl = true
 
 [dev-packages]
 pytest = ">=5.1"
-mypy = "*"
+mypy = ">=0.720"
 
 [packages]
 numpy = ">=1.17"
+sklearn = ">=0.21"
 
 [requires]
 python_version = "3.7"

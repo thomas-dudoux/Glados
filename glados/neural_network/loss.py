@@ -8,8 +8,6 @@ It contains the loss function definitions usable by a neural network
 """
 
 
-from typing import List
-
 import numpy as np
 
 
@@ -19,7 +17,7 @@ class Loss:
     """
 
     @staticmethod
-    def compute(y_true: List[float], y_pred: List[float]) -> float:
+    def compute(y_true: np.ndarray, y_pred: np.ndarray) -> float:
         raise NotImplementedError
 
     @staticmethod
@@ -33,7 +31,7 @@ class MSE(Loss):
     """
 
     @staticmethod
-    def compute(y_true: List[float], y_pred: List[float]) -> float:
+    def compute(y_true: np.ndarray, y_pred: np.ndarray) -> float:
         """
         Compute the mean squared error between two vectors
         :param y_true: The second vectors contains the true values
@@ -59,7 +57,7 @@ class LogCosH(Loss):
     """
 
     @staticmethod
-    def compute(y_true: List[float], y_pred: List[float]) -> float:
+    def compute(y_true: np.ndarray, y_pred: np.ndarray) -> float:
         """
         The logarithm of the hyperbolic cosine of the prediction error
         :param y_true: The second vectors contains the true values

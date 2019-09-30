@@ -39,8 +39,8 @@ class Neuron:
         self.optimizer = optimizer
         self.learning_rate = learning_rate
 
-    def learn(self, x_train: np.ndarray, y_train: np.ndarray, x_val=None, y_val=None,
-              iteration=100, batch_size=32, verbose=True) -> None:
+    def learn(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray = None,
+              y_val: np.ndarray = None, iteration=100, batch_size=32, verbose=True) -> None:
         """
         Make the neuron learn from the data (Basically Mini-batch SGD ATM)
         :param x_train: The learning data
@@ -75,7 +75,3 @@ if __name__ == '__main__':
     y_train = np.asarray([d[1] for d in dataset], dtype=np.float32)
     neuron = Neuron(1, sigmoid, MSE(), SGD())
     neuron.learn(x_train, y_train, iteration=1000)
-    predicted = neuron.predict([0.8])
-    print(f'Predicted value for 0.8 -> 1: {predicted}')
-    predicted = neuron.predict([0.2])
-    print(f'Predicted value for 0.2 -> 0: {predicted}')

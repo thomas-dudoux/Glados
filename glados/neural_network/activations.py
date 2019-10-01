@@ -8,6 +8,8 @@ It contains the activations function usable by a neuron
 """
 
 
+from __future__ import annotations
+
 from typing import Callable
 
 import numpy as np

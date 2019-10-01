@@ -8,13 +8,18 @@ It contains the optimizers function usable by a neural network
 """
 
 
+from __future__ import annotations
+
 from random import sample
-from typing import Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
 from glados.neural_network.helpers import shuffle_two_array_unison
+
+if TYPE_CHECKING:
+    from glados.neural_network.neuron import Neuron
 
 
 class Optimizer:
@@ -31,8 +36,9 @@ class Optimizer:
         self.val_loss_history = list()
         self.val_precision_history = list()
 
-    def compute(self, neuron: 'Neuron', x_train, y_train, x_val=None, y_val=None, iteration=100,
-                batch_size=32, verbose=True) -> None:
+    def compute(self, neuron: Neuron, x_train: np.ndarray, y_train: np.ndarray,
+                x_val: Optional[np.ndarray] = None, y_val: Optional[np.ndarray] = None,
+                iteration=100, batch_size=32, verbose=True) -> None:
         raise NotImplementedError
 
     @staticmethod
@@ -50,7 +56,7 @@ class Optimizer:
         precision = np.nan_to_num(np.diag(cm) / np.sum(cm, axis=0))
         return np.mean(precision)
 
-    def _compute_pred_error_precision(self, neuron: 'Neuron', xdata: np.ndarray, ytrue: np.ndarray,
+    def _compute_pred_error_precision(self, neuron: Neuron, xdata: np.ndarray, ytrue: np.ndarray,
                                       history: str) -> Tuple[np.ndarray, float, float]:
         """
         Compute the vector of prediction, the loss and the precision for a given ML structure and append
@@ -86,9 +92,9 @@ class SGD(Optimizer):
         """
         super().__init__()
 
-    def compute(self, neuron: 'Neuron', x_train: np.ndarray, y_train:  np.ndarray,
-                x_val: np.ndarray = None, y_val: np.ndarray = None, iteration=100, batch_size=32,
-                verbose=True) -> None:
+    def compute(self, neuron: Neuron, x_train: np.ndarray, y_train: np.ndarray,
+                x_val: Optional[np.ndarray] = None, y_val: Optional[np.ndarray] = None,
+                iteration=100, batch_size=32, verbose=True) -> None:
         """
         Execute the mini batch Stochastic Gradient Descent algorithm on a ML structure
         :param neuron: The neuron to apply the SGD on

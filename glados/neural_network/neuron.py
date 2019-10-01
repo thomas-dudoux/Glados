@@ -8,14 +8,17 @@ It contains all the necessary to define an artificial neuron
 """
 
 
-from typing import List
+from __future__ import annotations
+
+from typing import List, Optional, TYPE_CHECKING
 from random import random
 
 import numpy as np
 
-from glados.neural_network.activations import ActivationFunction, sigmoid
-from glados.neural_network.loss import Loss, MSE
-from glados.neural_network.optimizers import Optimizer, SGD
+if TYPE_CHECKING:
+    from glados.neural_network.activations import ActivationFunction
+    from glados.neural_network.loss import Loss
+    from glados.neural_network.optimizers import Optimizer
 
 
 class Neuron:
@@ -32,17 +35,17 @@ class Neuron:
         :param loss: The loss function to use to calculate the error
         :param learning_rate: The learning rate to use
         """
-        self.weights = [random() for _ in range(num_inputs)]
+        self.weights = np.array([random() for _ in range(num_inputs)])
         self.bias = random()
         self.activation = activation
         self.loss = loss
         self.optimizer = optimizer
         self.learning_rate = learning_rate
 
-    def learn(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray = None,
-              y_val: np.ndarray = None, iteration=100, batch_size=32, verbose=True) -> None:
+    def learn(self, x_train: np.ndarray, y_train: np.ndarray, x_val: Optional[np.ndarray] = None,
+              y_val: Optional[np.ndarray] = None, iteration=100, batch_size=32, verbose=True) -> None:
         """
-        Make the neuron learn from the data (Basically Mini-batch SGD ATM)
+        Make the neuron learn from the data (Basically just a wrapper around the optimizer)
         :param x_train: The learning data
         :param y_train: The learning prediction
         :param x_val: The validation data
@@ -63,15 +66,3 @@ class Neuron:
         return self.activation(act)
 
     predict = forward  # Alias for the forward function
-
-
-if __name__ == '__main__':
-    dataset = list()
-    for _ in range(1000):
-        x = random()
-        y = 1.0 if x >= 0.5 else 0.0
-        dataset.append((x, y))
-    x_train = np.asarray([[d[0]] for d in dataset], dtype=np.float32)
-    y_train = np.asarray([d[1] for d in dataset], dtype=np.float32)
-    neuron = Neuron(1, sigmoid, MSE(), SGD())
-    neuron.learn(x_train, y_train, iteration=1000)

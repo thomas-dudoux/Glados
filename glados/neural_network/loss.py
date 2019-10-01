@@ -8,6 +8,8 @@ It contains the loss function definitions usable by a neural network
 """
 
 
+from __future__ import annotations
+
 import numpy as np
 
 

@@ -6,10 +6,11 @@ verify_ssl = true
 [dev-packages]
 pytest = ">=5.1"
 mypy = ">=0.720"
+pylint = ">=2.4"
 
 [packages]
 numpy = ">=1.17"
-sklearn = ">=0.21"
+scikit-learn = ">=0.21.0"
 
 [requires]
 python_version = "3.7"

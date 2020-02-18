@@ -10,7 +10,12 @@ It contains the loss function definitions usable by a neural network
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
+
+if TYPE_CHECKING:
+    from glados.utils.types import NPVector
 
 
 class Loss:
@@ -19,7 +24,7 @@ class Loss:
     """
 
     @staticmethod
-    def compute(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    def compute(y_true: NPVector, y_pred: NPVector) -> float:
         raise NotImplementedError
 
     @staticmethod
@@ -33,7 +38,7 @@ class MSE(Loss):
     """
 
     @staticmethod
-    def compute(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    def compute(y_true: NPVector, y_pred: NPVector) -> float:
         """
         Compute the mean squared error between two vectors
         :param y_true: The second vectors contains the true values
@@ -59,7 +64,7 @@ class LogCosH(Loss):
     """
 
     @staticmethod
-    def compute(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    def compute(y_true: NPVector, y_pred: NPVector) -> float:
         """
         The logarithm of the hyperbolic cosine of the prediction error
         :param y_true: The second vectors contains the true values

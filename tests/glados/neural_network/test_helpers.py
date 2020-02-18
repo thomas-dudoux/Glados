@@ -12,7 +12,7 @@ from random import randint
 import numpy as np
 import pytest
 
-from glados.neural_network import helpers
+from glados.utils import helpers
 
 
 @pytest.fixture

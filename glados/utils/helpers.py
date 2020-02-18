@@ -14,8 +14,10 @@ from typing import Tuple
 
 import numpy as np
 
+from glados.utils.types import NPVector
 
-def shuffle_two_array_unison(arr1: np.ndarray, arr2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+
+def shuffle_two_array_unison(arr1: NPVector, arr2: NPVector) -> Tuple[NPVector, NPVector]:
     """
     Shuffle two array in unison, so array the shuffled the same way
     :param arr1: The first array to be shuffled

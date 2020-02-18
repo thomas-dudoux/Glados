@@ -10,15 +10,23 @@ It contains the activations function usable by a neuron
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import TYPE_CHECKING, Union
+from typing_extensions import Protocol
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from glados.utils.types import NPVector
 
-ActivationFunction = Callable[[float], float]
+
+class ActivationFunction(Protocol):
+    """
+    Class which define an activation function type
+    """
+    def __call__(self, x: Union[NPVector, float], derivative=False) -> Union[NPVector, float]: ...
 
 
-def sigmoid(x: float, derivative=False) -> float:
+def sigmoid(x: Union[NPVector, float], derivative=False) -> Union[NPVector, float]:
     """
     Calculate the y value of x on a sigmoid
     :param x: The value to calculate on the sigmoid
@@ -31,7 +39,7 @@ def sigmoid(x: float, derivative=False) -> float:
     return sigm
 
 
-def tanh(x: float, derivative=False) -> float:
+def tanh(x: Union[NPVector, float], derivative=False) -> Union[NPVector, float]:
     """
     Return the hyperbolic tangent of x
     :param x: The value to calculate the hyperbolic tangent
@@ -44,7 +52,7 @@ def tanh(x: float, derivative=False) -> float:
     return th
 
 
-def relu(x: float, derivative=False) -> float:
+def relu(x: Union[NPVector, float], derivative=False) -> Union[NPVector, float]:
     """
     Return the Rectified linear units of x
     :param x: The value to calculate the hyperbolic tangent
@@ -56,7 +64,7 @@ def relu(x: float, derivative=False) -> float:
     return np.maximum(0, x)
 
 
-def leaky_relu(x: float, derivative=False, alpha=0.01) -> float:
+def leaky_relu(x: Union[NPVector, float], derivative=False, alpha=0.01) -> Union[NPVector, float]:
     """
     Return the leaky rectified linear units of x
     :param x: The value to calculate the hyperbolic tangent
@@ -66,4 +74,4 @@ def leaky_relu(x: float, derivative=False, alpha=0.01) -> float:
     """
     if derivative:
         return alpha if x <= 0 else 1
-    return alpha*x if x <= 0 else x
+    return alpha * x if x <= 0 else x

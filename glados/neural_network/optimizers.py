@@ -10,6 +10,7 @@ It contains the optimizers function usable by a neural network
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from random import sample
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
@@ -19,7 +20,7 @@ from glados.utils.metrics import confusion_matrix
 from glados.utils.helpers import shuffle_two_array_unison
 
 if TYPE_CHECKING:
-    from glados.neural_network.neuron import Neuron, NeuralNetwork
+    from glados.neural_network.neuron import NeuralNetwork
     from glados.utils.types import NPVector
 
 
@@ -32,10 +33,8 @@ class Optimizer:
         """
         Initialize all optimizer class, setup loss and precision history
         """
-        self.train_loss_history = list()
-        self.train_precision_history = list()
-        self.val_loss_history = list()
-        self.val_precision_history = list()
+        self.train_precision_history: List[Precision] = list()
+        self.val_precision_history: List[Precision] = list()
 
     def compute(self, nn: NeuralNetwork, x_train: NPVector, y_train: NPVector,
                 x_val: Optional[NPVector] = None, y_val: Optional[NPVector] = None,
@@ -70,16 +69,29 @@ class Optimizer:
         """
         pred = np.asarray([nn.forward(xt) for xt in xdata], np.float32)
         error = nn.loss.compute(pred, ytrue)
-        precision = self._calculate_precision(pred, ytrue)
+        accuracy = self._calculate_precision(pred, ytrue)
         if history == 'train':
-            self.train_loss_history.append(error)
-            self.train_precision_history.append(precision)
+            self.train_precision_history.append(Precision(error, accuracy))
         elif history == 'validation':
-            self.val_loss_history.append(error)
-            self.val_precision_history.append(precision)
+            self.val_precision_history.append(Precision(error, accuracy))
         else:
             raise ValueError('The history argument can only be either "train" or "validation"')
-        return pred, error, precision
+        return pred, error, accuracy
+
+    def _logs(self, iteration: int) -> None:
+        """
+        Logs the status of the Neural network
+        :param iteration: The number of iteration the NN is at
+        """
+        train_loss = self.train_precision_history[-1].error
+        train_accuracy = self.train_precision_history[-1].accuracy * 100
+        print(f'Iteration : {iteration} =>')
+        print(f'    Train loss : {train_loss}  |  Train precision : {train_accuracy}')
+        if self.val_precision_history:
+            val_loss = self.val_precision_history[-1].error
+            val_accuracy = self.val_precision_history[-1].accuracy * 100
+            print(f'    Val loss : {val_loss}  |  Val Precision : {val_accuracy}')
+        print('*' * 20)
 
 
 class SGD(Optimizer):
@@ -95,7 +107,7 @@ class SGD(Optimizer):
 
     def compute(self, neural_network: NeuralNetwork, x_train: NPVector, y_train: NPVector,
                 x_val: Optional[NPVector] = None, y_val: Optional[NPVector] = None,
-                iteration=100, batch_size=32, batch=False, verbose=True) -> None:
+                iteration=100, batch_size=32, verbose=True, verbose_frequency=10) -> None:
         """
         Execute the mini batch Stochastic Gradient Descent algorithm on a ML structure
         :param nn: The NeuralNetwork to apply the SGD on
@@ -105,23 +117,24 @@ class SGD(Optimizer):
         :param y_val: The validation prediction
         :param iteration: The number of iteration for the neuron to learn
         :param batch_size: The number of randomly picked element to take at each iteration
-        TODO:param batch: If it should compute the batch as a whole or not (aka mean grad)
         :param verbose: If the algorithm should print information about his status
+        :param verbose_frequency: At how much frequency should we output some info
         """
         for i in range(iteration):
-            print(f'Iteration : {i} =>')
             random_indices = sample(range(len(x_train)), batch_size)
             it_x_train, it_y_train = shuffle_two_array_unison(x_train[random_indices], y_train[random_indices])
-            train_pred, train_error, train_precision = self._compute_pred_error_precision(neural_network, it_x_train, it_y_train, 'train')
-            if verbose:
-                print(f'    Train loss : {train_error}  |  Train precision : {train_precision*100}')
-            for xi, xt in enumerate(it_x_train):
-                neural_network.backpropagate_error(train_pred[xi], y_train[xi])
-                neural_network.update_weights(xt)
+            train_pred, _, _ = self._compute_pred_error_precision(neural_network, it_x_train, it_y_train, 'train')
+            neural_network.backpropagate_error(train_pred, it_y_train)
+            neural_network.update_weights(it_x_train)
             if x_val is not None and y_val is not None:
                 random_indices = sample(range(len(x_val)), batch_size)
                 it_x_val, it_y_val = shuffle_two_array_unison(x_val[random_indices], y_val[random_indices])
-                _, val_error, val_precision = self._compute_pred_error_precision(neural_network, it_x_val, it_y_val, 'validation')
-                if verbose:
-                    print(f'    Val loss : {val_error}  |  Val Precision : {val_precision*100}')
-            print('*' * 20)
+                self._compute_pred_error_precision(neural_network, it_x_val, it_y_val, 'validation')
+            if verbose and i % verbose_frequency == 0:
+                self._logs(i)
+
+
+@dataclass
+class Precision:
+    error: float
+    accuracy: float

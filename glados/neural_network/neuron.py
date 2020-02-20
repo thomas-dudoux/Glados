@@ -14,7 +14,6 @@ from typing import List, Optional, Sequence, Type, TYPE_CHECKING, Union
 from random import random
 
 import numpy as np
-from toolz import curry
 
 if TYPE_CHECKING:
     from glados.neural_network.activations import ActivationFunction
@@ -40,45 +39,53 @@ class NeuralNetwork:
         self.learning_rate = learning_rate
         self.layers: List[Layer] = list()
 
-    def backpropagate_error(self, preds: NPVector, y_train: NPVector) -> None:
+    def backpropagate_error(self, preds: NPTensor, y_true: NPTensor) -> None:
         """
         Apply the error backpropagation algortihm on a Neural Network
         :param preds: The list of predictions made by the neural network
-        :param y_train: The list of true values from the dataset
+        :param y_true: The list of true values from the dataset
         """
-        for onn, output_neuron in enumerate(self.layers[-1].neurons):  # Calculate the error for the output layer
-            # loss_derivative = self.loss.derivative(y_train[onn], preds[onn])
-            neuron_loss = self.loss.compute(y_train[onn], preds[onn])
-            # neuron_loss = y_train[onn] - preds[onn]
-            activation_derivative = output_neuron.activation(preds[onn], derivative=True)
-            output_neuron.error = neuron_loss * activation_derivative
-        for nl, layer in enumerate(self.layers[::-1][:-1]):  # Calculate the error for all the other layers
-            for neuron in layer.neurons:
-                for wl, weight in enumerate(neuron.weights):
-                    backpropagated_neuron = self.layers[::-1][nl+1].neurons[wl]
-                    backpropagated_neuron.error += (weight * neuron.error) * neuron.activation(neuron.output, derivative=True)
+        for il in reversed(range(len(self.layers))):
+            layer = self.layers[il]
+            if layer == self.layers[-1]:  # if it's the output layer
+                layer.error = self.loss.compute(y_true, preds)
+                # layer.error = y_train - preds
+                layer.delta = layer.error * layer.activation(preds, derivative=True)
+            else:  # if it's the other layers
+                previous_layer = self.layers[il+1]
+                layer.error = np.dot(previous_layer.neurons['weights'], previous_layer.delta)
+                layer.delta = layer.error * layer.activation(layer.output, derivative=True)
 
     def update_weights(self, x_train: NPTensor) -> None:
         """
         Update the all the weight of a neural network given the error of each neuron
         :param x_train: The input data that have caused the error and that we should use to update the weights
         """
-        for inn, input_neuron in enumerate(self.layers[0].neurons):
-            input_neuron.update_weights(self.learning_rate, x_train[inn])
-        for nl, layer in enumerate(self.layers[1:], start=1):
-            inputs_data = np.asarray([neuron.output for neuron in self.layers[nl-1].neurons], dtype=np.float32)
-            for neuron in layer.neurons:
-                for weight in neuron.weights:
-                    neuron.update_weights(self.learning_rate, inputs_data)
+        for il, layer in enumerate(self.layers):
+            input_data = np.atleast_2d(x_train if il == 0 else self.layers[il-1].output)
+            layer.neurons['weights'] += layer.delta * input_data.T * self.learning_rate
+            layer.neurons['bias'] += layer.delta * self.learning_rate
 
-    @curry
-    def add(self, layer: Type[Layer], num_neurons: int, neuron: Type[Neuron],
-            num_inputs: int, activation: ActivationFunction, dropout: float = None) -> None:
+    def add(self, layer: Type[Layer], num_neurons: int, activation: ActivationFunction,
+            num_inputs: Optional[int] = None, bias=True, dropout: Optional[float] = None) -> None:
         """
         Add a layer to the neural network, be it either a Input or a Layer
-        :param layer: The layer that you want to add to the NN
+        :param layer: The class of the layer type to add in the NN
+        :param num_neurons: The number of neurons that the layer should have
+        :param activation: The activation function to use with this layer
+        :param num_inputs: The number of input for each neuron to have,
+            equals to the number of neuron in the previous layer if None, defaults to None
+        :param bias: If the layer should have a bias neuron, defaults to True
+        :param dropout: The dropout proportion to apply on the forward and backpropagation pass, defaults to None
         """
-        new_layer = layer([neuron(num_inputs, activation) for _ in range(num_neurons)], dropout)
+        if layer != Input and not self.layers:
+            raise ValueError("The first layer should be an Input layer")
+        # if layer == Input and num_inputs is None:
+        #     num_inputs = 1
+        if layer != Input and num_inputs is None:
+            num_inputs = self.layers[-1].neurons['weights'].shape[-1]
+            # num_inputs = len(self.layers[-1].neurons['weights'])
+        new_layer = layer(num_neurons, activation, num_inputs, bias, dropout)
         self.layers.append(new_layer)
 
     def learn(self, x_train: NPVector, y_train: NPVector, x_val: Optional[NPVector] = None,
@@ -95,22 +102,36 @@ class NeuralNetwork:
         """
         self.optimizer.compute(self, x_train, y_train, x_val, y_val, iteration, batch_size, verbose)
 
-    def forward(self, data: NPVector) -> NPVector:
+    def forward(self, data: NPVector, clear_output=False) -> NPVector:
         """
         Get a prediction from the neural network
         :param data: The data to predict from
+        :param clear_output: If we should clear the output of our layers after the forward pass
         """
-        self.layers[0].layer_inputs = data
-        self.layers[0].forward()
-        for l in range(1, len(self.layers)):
-            self.layers[l].layer_inputs = self.layers[l-1].layer_outputs
-            self.layers[l].forward()
-        res = self.layers[-1].layer_outputs
+        layer_output = self.layers[0].forward(data)
+        for li in range(1, len(self.layers)):
+            layer_output = self.layers[li].forward(layer_output)
+        nn_out = self.layers[-1].output
+        if clear_output:
+            self.clear_layers_output()
+        return nn_out
+
+    def predict(self, data: NPVector,) -> NPVector:
+        """
+        Normalize the predicted values
+        :param data: The data to predict from
+        :return: The vector of predicted values
+        """
+        res = self.forward(data)
+        axis = None if res.ndim == 1 else 1
+        return np.argmax(res, axis=axis)
+
+    def clear_layers_output(self) -> None:
+        """
+        Reset the output of each layer in the NN
+        """
         for layer in self.layers:
             layer.clear()
-        return res
-
-    predict = forward  # Alias for the forward function
 
 
 class Layer:
@@ -118,97 +139,65 @@ class Layer:
     Class that act as a layer containing multiple neurons
     """
 
-    def __init__(self, neurons: Sequence[Neuron], dropout: float = None):
+    def __init__(self, num_neurons: int, activation: ActivationFunction,
+                 num_inputs: int, bias=True, dropout: Optional[float] = None):
         """
-        Initialize layer containing multiple neurons
-        :param neurons: The list of neurons to be in the layer
-        :param dropout: The dropout probability to apply on the layer during forward pass
-        """
-        self.neurons = neurons
-        self.layer_outputs = np.zeros(len(neurons), dtype=np.float32)
-        self.layer_inputs = np.zeros(len(neurons), dtype=np.float32)
-        self.dropout = dropout
 
-    def forward(self) -> None:
+        :param num_neurons: [description]
+        :param num_inputs: [description]
+        :param activation: [description]
+        :param bias: [description], defaults to True
+        :param dropout: [description], defaults to None
+        """
+        self.neurons = {
+            'weights': np.random.random((num_inputs, num_neurons)),
+            'bias': np.random.random(num_neurons)
+        }
+        self.activation = activation
+        self.output = np.zeros(num_neurons, dtype=np.float32)
+        self.dropout = dropout
+        self.delta = 0.0
+        self.error = 0.0
+
+    def forward(self, input_data: NPVector) -> NPVector:
         """
         Make a forward pass onto the layer
         """
-        for n in range(len(self.neurons)):
-            if self.dropout and random() <= self.dropout:
-                self.layer_outputs[n] = 0.0
-            else:
-                self.layer_outputs[n] = self.neurons[n].forward(self.layer_inputs)
+        out = np.dot(input_data, self.neurons['weights']) + self.neurons['bias']
+        out = self.activation(out)
+        self.output.append(out)
+        return out
 
     def clear(self) -> None:
         """
         Clear the inputs and outputs buffer lists
         """
-        self.layer_outputs = np.zeros(len(self.neurons), dtype=np.float32)
-        self.layer_inputs = np.zeros(len(self.neurons), dtype=np.float32)
+        self.output = np.zeros(self.neurons, dtype=np.float32)
 
 
 class Input(Layer):
     """
-    Class that act as a layer containing multiple neurons
+    Class that act as a layer of input for a NN
     """
 
-    def __init__(self, neurons: Sequence[Neuron]):
+    def __init__(self, num_neurons: int, activation: ActivationFunction,
+                 num_inputs: Optional[int] = 1, bias=True, dropout: Optional[float] = None):
         """
-        Initialize layer containing multiple neurons
-        :param neurons: The list of neurons to be in the layer
+        Initialize an Input layer with one input per neuron
+        All the parameters are the same than the parent "Layer" class
         """
-        super().__init__(neurons)
-
-    def forward(self) -> None:
-        """
-        Make a forward pass onto the layer
-        """
-        for n in range(len(self.neurons)):
-            self.layer_outputs[n] = self.neurons[n].forward(self.layer_inputs[n])
+        super().__init__(num_neurons, activation, num_inputs, bias, dropout)
 
 
-class Neuron:
+class Dense(Layer):
     """
-    Class that act as an artificial neuron
+    Class that a layer of dense neuron
     """
 
-    def __init__(self, num_inputs: int, activation: ActivationFunction, bias=True):
+    def __init__(self, num_neurons: int, activation: ActivationFunction,
+                 num_inputs: int, bias=True, dropout: Optional[float] = None):
         """
-        Initialize the neuron class with random weight and given loss and activation function
-        :param num_inputs: The number of inputs that the neuron will have
-        :param activation: The activation function that the neuron will use
-        :param bias: If the neuron should have a bias or not
+        Initialize a Dense layer for a NN
+        All the parameters are the same than the parent "Layer" class
         """
-        self.weights = np.array([random() for _ in range(num_inputs)])
-        self.bias = random() if bias else None
-        self.activation = activation
-        self.error = 0.0
-        self.output = 0.0
-
-    def forward(self, inputs: NPVector) -> float:
-        """
-        Do a forward pass on the neuron (aka sum of the inputs weighted plus the bias)
-        :param inputs: The list of inputs data to predict from
-        :return: The value returned by the activation function
-        """
-        if self.bias is not None:
-            out = self.bias + np.dot(inputs, self.weights)
-        else:
-            out = np.dot(inputs, self.weights)
-        self.output = self.activation(out)
-        return self.output
-
-    def update_weights(self, learning_rate: float, input_data: Union[NPVector, float]) -> None:
-        """
-        Update the weights of the neuron for a given learning rate and input
-        :param learning_rate: The learning to update the weights with
-        :param input_data: The input that cause the weight change
-        """
-        lr_err = learning_rate * self.error
-        for w in range(len(self.weights)):
-            try:  # If it's a vector aka a neuron in the hidden or output layer
-                self.weights[w] += lr_err * input_data[w]
-            except (TypeError, IndexError):  # If it's a float aka a neuron in the input layer
-                self.weights[w] += lr_err * input_data
-        if self.bias is not None:
-            self.bias += lr_err
+        super().__init__(num_neurons, activation, num_inputs, bias, dropout)

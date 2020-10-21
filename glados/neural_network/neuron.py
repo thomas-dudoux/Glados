@@ -5,9 +5,6 @@
 """
 The Neuron module
 It contains all the necessary to define an artificial neuron
-https://stackoverflow.com/questions/54332566/how-to-update-weights-when-using-mini-batches
-back propagate error mini batch
-backpropagation algorithm python
 """
 
 
@@ -61,15 +58,13 @@ class NeuralNetwork:
         :param preds: The list of predictions made by the neural network
         :param y_true: The list of true values from the dataset
         """
-        # self.output_layer.errors = self.loss.compute(y_true, preds)
         self.output_layer.errors = y_true - preds
         self.output_layer.deltas = self.output_layer.errors * self.output_layer.activation(preds, derivative=True)
-        for bi in range(len(preds)):
-            for il in reversed(range(len(self.layers[:-1]))):
-                layer = self.layers[il]
-                previous_layer = self.layers[il+1]
-                layer.errors.append(previous_layer.errors[bi].dot(previous_layer.neurons['weights'].T))
-                layer.deltas.append(layer.errors[-1] * layer.activation(layer.outputs[bi], derivative=True))
+        for li in reversed(range(len(self.layers[:-1]))):
+            layer = self.layers[li]
+            previous_layer = self.layers[li+1]
+            layer.errors = previous_layer.deltas.dot(previous_layer.neurons['weights'].T)
+            layer.deltas = layer.errors * layer.activation(layer.outputs, derivative=True)
 
     def batch_weights_update(self, x_train: NPTensor) -> None:
         """
@@ -80,7 +75,10 @@ class NeuralNetwork:
         for il, layer in enumerate(self.layers):
             input_data = x_train if il == 0 else np.asarray(self.layers[il-1].outputs, np.float32)
             deltas = np.asarray(layer.deltas, dtype=np.float32)
-            layer.neurons['weights'] += input_data.T.dot(deltas).mean(axis=0) * self.learning_rate
+            if il == 0 and layer.num_inputs == 1:
+                layer.neurons['weights'] += np.multiply(input_data, deltas).T.mean(axis=1) * self.learning_rate
+            else:
+                layer.neurons['weights'] += input_data.T.dot(deltas) * self.learning_rate
             layer.neurons['bias'] += deltas.mean(axis=0) * self.learning_rate
 
     def update_weights(self, x_train: NPTensor) -> None:
@@ -115,7 +113,6 @@ class NeuralNetwork:
             num_inputs = 1
         if layer != Input and num_inputs is None:
             num_inputs = self.output_layer.neurons['weights'].shape[-1]
-            # num_inputs = len(self.output_layer.neurons['weights'])
         new_layer = layer(num_neurons, activation, num_inputs, bias, dropout)
         self.layers.append(new_layer)
 
@@ -188,9 +185,9 @@ class Layer:
         self.activation = activation
         # self.output = np.zeros(num_neurons, dtype=np.float32)
         self.dropout = dropout
-        self.outputs: List[np.ndarray] = list()
-        self.deltas: List[np.ndarray] = list()
-        self.errors: List[np.ndarray] = list()
+        self._outputs: List[np.ndarray] = list()
+        self.deltas: np.ndarray = None
+        self.errors: np.ndarray = None
 
     def forward(self, input_data: NPVector) -> NPVector:
         """
@@ -198,7 +195,7 @@ class Layer:
         """
         out = np.dot(input_data, self.neurons['weights']) + self.neurons['bias']
         out = self.activation(out)
-        self.outputs.append(out)
+        self._outputs.append(out)
         return out
 
     def clear(self) -> None:
@@ -206,9 +203,16 @@ class Layer:
         Clear the inputs and outputs buffer lists
         """
         # self.output = np.zeros(self.neurons, dtype=np.float32)
-        self.outputs = list()
-        self.errors = list()
-        self.deltas = list()
+        self._outputs = list()
+        self.errors = None
+        self.deltas = None
+
+    @property
+    def outputs(self) -> NPTensor:
+        """
+        Return the outputs as a vector of numpy array
+        """
+        return np.asarray(self._outputs, dtype=np.float32)
 
 
 class Input(Layer):
@@ -232,7 +236,7 @@ class Input(Layer):
             out = input_data * self.neurons['weights'][0]
         else:
             out = super().forward(input_data)
-        self.outputs.append(out)
+        self._outputs.append(out)
         return out
 
 

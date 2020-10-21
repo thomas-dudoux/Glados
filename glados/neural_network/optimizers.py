@@ -67,16 +67,16 @@ class Optimizer:
         :param history: The history to which the error and precision should be added (train or validation)
         :raise ValueError: If the history argument is not either 'train' or 'validation'
         """
-        pred = np.asarray([nn.forward(xt) for xt in xdata], np.float32)
-        error = nn.loss.compute(pred, ytrue)
-        accuracy = self._calculate_precision(pred, ytrue)
+        preds = np.asarray([nn.forward(xt) for xt in xdata], np.float32)
+        error = nn.loss.compute(preds, ytrue)
+        accuracy = self._calculate_precision(preds, ytrue)
         if history == 'train':
             self.train_precision_history.append(Precision(error, accuracy))
         elif history == 'validation':
             self.val_precision_history.append(Precision(error, accuracy))
         else:
             raise ValueError('The history argument can only be either "train" or "validation"')
-        return pred, error, accuracy
+        return preds, error, accuracy
 
     def _logs(self, iteration: int) -> None:
         """
@@ -125,8 +125,8 @@ class SGD(Optimizer):
             it_x_train, it_y_train = shuffle_two_array_unison(x_train[random_indices], y_train[random_indices])
             train_pred, _, _ = self._compute_pred_error_precision(neural_network, it_x_train, it_y_train, 'train')
             neural_network.backpropagate_error(train_pred, it_y_train)
-            # neural_network.batch_weights_update(it_x_train)
-            neural_network.update_weights(it_x_train)
+            neural_network.batch_weights_update(it_x_train)
+            # neural_network.update_weights(it_x_train)
             if x_val is not None and y_val is not None:
                 random_indices = sample(range(len(x_val)), batch_size)
                 it_x_val, it_y_val = shuffle_two_array_unison(x_val[random_indices], y_val[random_indices])

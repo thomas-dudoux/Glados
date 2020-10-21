@@ -8,8 +8,8 @@ Define all the custom types for the Glados package
 """
 
 
-from nptyping import Array
+from nptyping import NDArray, Float
 
 
-NPVector = Array[float]
-NPTensor = Array[NPVector]  # AKA a matrix
+NPVector = NDArray[Float]
+NPTensor = NDArray[NPVector]  # AKA a matrix

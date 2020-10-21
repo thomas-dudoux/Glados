@@ -5,13 +5,15 @@
 """
 The Neuron module
 It contains all the necessary to define an artificial neuron
+https://stackoverflow.com/questions/54332566/how-to-update-weights-when-using-mini-batches
+back propagate error mini batch
+backpropagation algorithm python
 """
 
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Type, TYPE_CHECKING, Union
-from random import random
+from typing import List, Optional, Type, TYPE_CHECKING
 
 import numpy as np
 
@@ -39,36 +41,65 @@ class NeuralNetwork:
         self.learning_rate = learning_rate
         self.layers: List[Layer] = list()
 
+    @property
+    def output_layer(self) -> Layer:
+        """
+        Return the last layer (output layer) of the neural network
+        """
+        return self.layers[-1]
+
+    @property
+    def input_layer(self) -> Layer:
+        """
+        Return the first layer (input layer) of the neural network
+        """
+        return self.layers[0]
+
     def backpropagate_error(self, preds: NPTensor, y_true: NPTensor) -> None:
         """
         Apply the error backpropagation algortihm on a Neural Network
         :param preds: The list of predictions made by the neural network
         :param y_true: The list of true values from the dataset
         """
-        for il in reversed(range(len(self.layers))):
-            layer = self.layers[il]
-            if layer == self.layers[-1]:  # if it's the output layer
-                layer.error = self.loss.compute(y_true, preds)
-                # layer.error = y_train - preds
-                layer.delta = layer.error * layer.activation(preds, derivative=True)
-            else:  # if it's the other layers
+        # self.output_layer.errors = self.loss.compute(y_true, preds)
+        self.output_layer.errors = y_true - preds
+        self.output_layer.deltas = self.output_layer.errors * self.output_layer.activation(preds, derivative=True)
+        for bi in range(len(preds)):
+            for il in reversed(range(len(self.layers[:-1]))):
+                layer = self.layers[il]
                 previous_layer = self.layers[il+1]
-                layer.error = np.dot(previous_layer.neurons['weights'], previous_layer.delta)
-                layer.delta = layer.error * layer.activation(layer.output, derivative=True)
+                layer.errors.append(previous_layer.errors[bi].dot(previous_layer.neurons['weights'].T))
+                layer.deltas.append(layer.errors[-1] * layer.activation(layer.outputs[bi], derivative=True))
 
-    def update_weights(self, x_train: NPTensor) -> None:
+    def batch_weights_update(self, x_train: NPTensor) -> None:
         """
-        Update the all the weight of a neural network given the error of each neuron
+        Update all the weight of a neural network given the error of each neuron
+        Using the batch method averaging
         :param x_train: The input data that have caused the error and that we should use to update the weights
         """
         for il, layer in enumerate(self.layers):
-            input_data = np.atleast_2d(x_train if il == 0 else self.layers[il-1].output)
-            layer.neurons['weights'] += layer.delta * input_data.T * self.learning_rate
-            layer.neurons['bias'] += layer.delta * self.learning_rate
+            input_data = x_train if il == 0 else np.asarray(self.layers[il-1].outputs, np.float32)
+            deltas = np.asarray(layer.deltas, dtype=np.float32)
+            layer.neurons['weights'] += input_data.T.dot(deltas).mean(axis=0) * self.learning_rate
+            layer.neurons['bias'] += deltas.mean(axis=0) * self.learning_rate
+
+    def update_weights(self, x_train: NPTensor) -> None:
+        """
+        Update all the weight of a neural network given the error of each neuron
+        :param x_train: The input data that have caused the error and that we should use to update the weights
+        """
+        for xti in range(len(x_train)):
+            for il, layer in enumerate(self.layers):
+                input_data = x_train[xti] if il == 0 else np.asarray(self.layers[il-1].outputs[xti], np.float32)
+                if il == 0 and layer.num_inputs == 1:
+                    layer.neurons['weights'] += (layer.deltas[xti] * input_data) * self.learning_rate
+                else:
+                    layer.neurons['weights'] += (layer.deltas[xti] * np.expand_dims(input_data, axis=1)) * self.learning_rate
+                layer.neurons['bias'] += layer.deltas[xti] * self.learning_rate
 
     def add(self, layer: Type[Layer], num_neurons: int, activation: ActivationFunction,
             num_inputs: Optional[int] = None, bias=True, dropout: Optional[float] = None) -> None:
-        """
+        """ 
         Add a layer to the neural network, be it either a Input or a Layer
         :param layer: The class of the layer type to add in the NN
         :param num_neurons: The number of neurons that the layer should have
@@ -80,11 +111,11 @@ class NeuralNetwork:
         """
         if layer != Input and not self.layers:
             raise ValueError("The first layer should be an Input layer")
-        # if layer == Input and num_inputs is None:
-        #     num_inputs = 1
+        if layer == Input and num_inputs is None:
+            num_inputs = 1
         if layer != Input and num_inputs is None:
-            num_inputs = self.layers[-1].neurons['weights'].shape[-1]
-            # num_inputs = len(self.layers[-1].neurons['weights'])
+            num_inputs = self.output_layer.neurons['weights'].shape[-1]
+            # num_inputs = len(self.output_layer.neurons['weights'])
         new_layer = layer(num_neurons, activation, num_inputs, bias, dropout)
         self.layers.append(new_layer)
 
@@ -108,15 +139,14 @@ class NeuralNetwork:
         :param data: The data to predict from
         :param clear_output: If we should clear the output of our layers after the forward pass
         """
-        layer_output = self.layers[0].forward(data)
+        layer_output = self.input_layer.forward(data)
         for li in range(1, len(self.layers)):
             layer_output = self.layers[li].forward(layer_output)
-        nn_out = self.layers[-1].output
         if clear_output:
             self.clear_layers_output()
-        return nn_out
+        return layer_output
 
-    def predict(self, data: NPVector,) -> NPVector:
+    def predict(self, data: NPVector) -> NPVector:
         """
         Normalize the predicted values
         :param data: The data to predict from
@@ -142,22 +172,25 @@ class Layer:
     def __init__(self, num_neurons: int, activation: ActivationFunction,
                  num_inputs: int, bias=True, dropout: Optional[float] = None):
         """
-
-        :param num_neurons: [description]
-        :param num_inputs: [description]
-        :param activation: [description]
-        :param bias: [description], defaults to True
-        :param dropout: [description], defaults to None
+        Initialize a layer with random weights and bias
+        :param num_neurons: The number of neurons in the layer
+        :param num_inputs: The number of input of each neurons in the layer
+        :param activation: The activation function used by each neurons in the layer
+        :param bias: If the layer should have a bias neuron or not, defaults to True
+        :param dropout: The percentage of dropout in the layer, defaults to None
         """
+        self.num_neurons = num_neurons
+        self.num_inputs = num_inputs
         self.neurons = {
             'weights': np.random.random((num_inputs, num_neurons)),
-            'bias': np.random.random(num_neurons)
+            'bias': np.random.random(num_neurons) if bias else 0.
         }
         self.activation = activation
-        self.output = np.zeros(num_neurons, dtype=np.float32)
+        # self.output = np.zeros(num_neurons, dtype=np.float32)
         self.dropout = dropout
-        self.delta = 0.0
-        self.error = 0.0
+        self.outputs: List[np.ndarray] = list()
+        self.deltas: List[np.ndarray] = list()
+        self.errors: List[np.ndarray] = list()
 
     def forward(self, input_data: NPVector) -> NPVector:
         """
@@ -165,14 +198,17 @@ class Layer:
         """
         out = np.dot(input_data, self.neurons['weights']) + self.neurons['bias']
         out = self.activation(out)
-        self.output.append(out)
+        self.outputs.append(out)
         return out
 
     def clear(self) -> None:
         """
         Clear the inputs and outputs buffer lists
         """
-        self.output = np.zeros(self.neurons, dtype=np.float32)
+        # self.output = np.zeros(self.neurons, dtype=np.float32)
+        self.outputs = list()
+        self.errors = list()
+        self.deltas = list()
 
 
 class Input(Layer):
@@ -181,12 +217,23 @@ class Input(Layer):
     """
 
     def __init__(self, num_neurons: int, activation: ActivationFunction,
-                 num_inputs: Optional[int] = 1, bias=True, dropout: Optional[float] = None):
+                 num_inputs: Optional[int] = 1, bias=False, dropout: Optional[float] = None):
         """
         Initialize an Input layer with one input per neuron
         All the parameters are the same than the parent "Layer" class
         """
         super().__init__(num_neurons, activation, num_inputs, bias, dropout)
+
+    def forward(self, input_data: NPVector) -> NPVector:
+        """
+        Make a forward pass onto the layer
+        """
+        if self.neurons['weights'].shape[0] == 1:
+            out = input_data * self.neurons['weights'][0]
+        else:
+            out = super().forward(input_data)
+        self.outputs.append(out)
+        return out
 
 
 class Dense(Layer):

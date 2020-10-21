@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from glados.utils.types import NPVector
+    from glados.utils.types import NPTensor
 
 
 class Loss:
@@ -24,7 +24,7 @@ class Loss:
     """
 
     @staticmethod
-    def compute(y_true: NPVector, y_pred: NPVector) -> float:
+    def compute(y_true: NPTensor, y_pred: NPTensor) -> float:
         raise NotImplementedError
 
     @staticmethod
@@ -38,7 +38,7 @@ class MSE(Loss):
     """
 
     @staticmethod
-    def compute(y_true: NPVector, y_pred: NPVector) -> float:
+    def compute(y_true: NPTensor, y_pred: NPTensor) -> float:
         """
         Compute the mean squared error between two vectors
         :param y_true: The second vectors contains the true values
@@ -64,7 +64,7 @@ class LogCosH(Loss):
     """
 
     @staticmethod
-    def compute(y_true: NPVector, y_pred: NPVector) -> float:
+    def compute(y_true: NPTensor, y_pred: NPTensor) -> float:
         """
         The logarithm of the hyperbolic cosine of the prediction error
         :param y_true: The second vectors contains the true values

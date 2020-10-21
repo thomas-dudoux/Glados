@@ -15,9 +15,9 @@ from glados.neural_network.activations import sigmoid
 dsize = 384
 dataset = np.empty((dsize, 3), dtype=np.float32)
 for i in range(dsize):
-    r1 = random() * 10.
-    r2 = random() * 10.
-    res = 1.0 if (r1 + r2) >= 10. else 0.0
+    r1 = round(random() * 10)
+    r2 = round(random() * 10)
+    res = 1.0 if (r1 + r2) >= 10 else 0.0
     dataset[i] = np.asarray([r1, r2, res], dtype=np.float32)
 
 x_train = dataset[:320][:, :2] / 10.
@@ -26,7 +26,7 @@ x_val = dataset[320:][:, :2] / 10.
 y_val = dataset[320:][:, 2:]
 
 dorothy = NeuralNetwork(MSE(), SGD())
-dorothy.add(Input, 2, sigmoid, 2)
+dorothy.add(Input, 2, sigmoid)
 dorothy.add(Dense, 3, sigmoid)
 dorothy.add(Dense, 1, sigmoid)
 dorothy.learn(x_train, y_train, x_val, y_val)

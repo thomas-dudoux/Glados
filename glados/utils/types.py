@@ -12,4 +12,4 @@ from nptyping import Array
 
 
 NPVector = Array[float]
-NPTensor = Array[NPVector]
+NPTensor = Array[NPVector]  # AKA a matrix
